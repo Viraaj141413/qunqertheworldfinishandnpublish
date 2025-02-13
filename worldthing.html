@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive World Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #d4e9d1; /* Greenish background */
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 20px;
+      font-size: 2.5em;
+      color: #333;
+    }
+
+    #map {
+      width: 100%;
+      height: 80vh;
+      margin-top: 20px;
+    }
+
+    #info-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 300px; /* Make panel compact */
+      width: 90%;
+      text-align: left;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      max-height: 60vh;
+      overflow-y: auto;
+      font-size: 1.1em;
+    }
+
+    #info-panel h2 {
+      margin-top: 0;
+      font-size: 1.8em;
+      color: #333;
+    }
+
+    .country-info {
+      font-size: 1.1em;
+      margin-bottom: 10px;
+      color: #555;
+    }
+
+    a {
+      color: #007BFF;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .highlight {
+      fill: #ffcc00 !important;
+      stroke: #000 !important;
+      stroke-width: 2;
+    }
+
+    /* Styling for population link */
+    .population-link {
+      cursor: pointer;
+      color: #007BFF;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Interactive World Map</h1>
+  <div id="map"></div>
+
+  <div id="info-panel">
+    <h2>Country Information</h2>
+    <p id="country-name">Click on a country to see its details.</p>
+    <div class="country-info">
+      <strong>Population:</strong>
+      <p id="population-info"></p>
+      <strong>Area:</strong>
+      <p id="area-info"></p>
+      <strong>Capital:</strong>
+      <p id="capital-info"></p>
+      <strong>Languages:</strong>
+      <p id="language-info"></p>
+      <strong>Military Ranking:</strong>
+      <p id="military-ranking-info"></p>
+      <strong>Air Quality Index:</strong>
+      <p id="air-quality-index-info"></p>
+      <strong>Worst War Fought:</strong>
+      <p id="worst-war-info"></p>
+    </div>
+    <p id="google-search" class="country-info"></p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([20, 0], 2);  // Starting position and zoom level
+
+    // Add OpenStreetMap tiles to the map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Store air quality rankings in a global object
+    const airQualityData = {};
+
+    // Load GeoJSON data for countries
+    function loadGeoJSONData() {
+      fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json') 
+        .then(response => response.json())
+        .then(data => {
+          L.geoJSON(data, {
+            style: {
+              fillColor: '#d4e9d1',
+              weight: 1,
+              opacity: 1,
+              color: '#555',
+              fillOpacity: 0.7
+            },
+            onEachFeature: function (feature, layer) {
+              const countryName = feature.properties.name;
+              layer.on('click', function () {
+                highlightCountry(layer, countryName);
+              });
+            }
+          }).addTo(map);
+        })
+        .catch(error => console.error('Error loading GeoJSON data:', error));
+    }
+
+    // Fetch country information (population, area, capital, languages)
+    function fetchCountryInfo(countryName) {
+      const url = `https://restcountries.com/v3.1/name/${countryName}?fullText=true`;
+
+      return fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          const country = data[0];
+          const airQuality = getAirQualityRanking(countryName);
+
+          return {
+            population: country.population ? country.population.toLocaleString() : 'N/A',
+            area: country.area ? country.area.toLocaleString() + ' km²' : 'N/A',
+            capital: country.capital ? country.capital.join(', ') : 'N/A',
+            languages: country.languages ? Object.values(country.languages).join(', ') : 'N/A',
+            militaryRanking: getMilitaryRanking(countryName),
+            airQualityIndex: airQuality,
+            worstWar: getWorstWar(countryName) 
+          };
+        })
+        .catch(error => {
+          console.error('Error fetching country info:', error);
+          return {
+            population: 'N/A',
+            area: 'N/A',
+            capital: 'N/A',
+            languages: 'N/A',
+            militaryRanking: 'N/A',
+            airQualityIndex: 'N/A',
+            worstWar: 'N/A'
+          };
+        });
+    }
+
+    // Fetch air quality index using World Air Quality API (mock data for example)
+    function getAirQualityRanking(countryName) {
+      // If air quality data already exists for this country, return it
+      if (airQualityData[countryName]) {
+        return airQualityData[countryName];
+      }
+
+      const airQualityRanks = [
+        { name: 'Good', range: [0, 50] },
+        { name: 'Fine', range: [51, 100] },
+        { name: 'Not Good', range: [101, 150] },
+        { name: 'Bad', range: [151, 200] },
+        { name: 'Unhealthy', range: [201, 300] },
+        { name: 'Unstable', range: [301, 400] },
+        { name: 'Dangerous', range: [401, 500] },
+        { name: 'Horrible', range: [501, Infinity] }
+      ];
+
+      // Mock Air Quality Score
+      const airQualityScore = Math.floor(Math.random() * 300);  // More lenient scoring for this example
+
+      // Find the ranking for this air quality score
+      const ranking = airQualityRanks.find(rank => airQualityScore >= rank.range[0] && airQualityScore <= rank.range[1]);
+      const airQuality = ranking ? `${ranking.name} (AQI: ${airQualityScore})` : 'N/A';
+
+      // Store the air quality for future reference
+      airQualityData[countryName] = airQuality;
+
+      return airQuality;
+    }
+
+    // Military Ranking for North America and Europe (mock data)
+    function getMilitaryRanking(countryName) {
+      const militaryRankings = {
+        'USA': '1st',
+        'Canada': '20th',
+        'Mexico': '35th',
+        'Germany': '10th',
+        'France': '6th',
+        'United Kingdom': '8th',
+        'Italy': '12th',
+        'Spain': '25th',
+        'Poland': '22nd',
+        'Russia': '2nd',
+        'Ukraine': '15th',
+        'Turkey': '11th',
+        'Belgium': '30th',
+        'Netherlands': '18th',
+        'Sweden': '35th',
+        'Norway': '28th',
+        'Finland': '40th',
+        'Denmark': '45th'
+      };
+      return militaryRankings[countryName] || 'N/A';
+    }
+
+    // Sample data for worst war fought
+    function getWorstWar(countryName) {
+      const wars = {
+        'USA': 'Vietnam War',
+        'Germany': 'World War II',
+        'Russia': 'World War II',
+        'UK': 'World War II',
+        'France': 'World War I'
+      };
+      return wars[countryName] || 'N/A';
+    }
+
+    // Highlight clicked country and show info
+    function highlightCountry(layer, countryName) {
+      map.eachLayer(layer => {
+        if (layer.setStyle) {
+          layer.setStyle({
+            fillColor: '#d4e9d1', 
+            color: '#555',
+            weight: 1
+          });
+        }
+      });
+
+      layer.setStyle({
+        fillColor: '#ffcc00',
+        color: '#000',
+        weight: 2
+      });
+
+      fetchCountryInfo(countryName).then(countryInfo => {
+        const countryNameEl = document.getElementById('country-name');
+        const populationInfoEl = document.getElementById('population-info');
+        const areaInfoEl = document.getElementById('area-info');
+        const capitalInfoEl = document.getElementById('capital-info');
+        const languageInfoEl = document.getElementById('language-info');
+        const militaryRankingInfoEl = document.getElementById('military-ranking-info');
+        const airQualityIndexInfoEl = document.getElementById('air-quality-index-info');
+        const worstWarInfoEl = document.getElementById('worst-war-info');
+        const googleSearchEl = document.getElementById('google-search');
+        const infoPanel = document.getElementById('info-panel');
+
+        countryNameEl.textContent = `Country: ${countryName}`;
+        populationInfoEl.innerHTML = `<span class="population-link" onclick="window.open('https://www.google.com/search?q=${countryName}+population')">${countryInfo.population}</span>`;
+        areaInfoEl.textContent = countryInfo.area;
+        capitalInfoEl.textContent = countryInfo.capital;
+        languageInfoEl.textContent = countryInfo.languages;
+        militaryRankingInfoEl.textContent = countryInfo.militaryRanking;
+        airQualityIndexInfoEl.textContent = countryInfo.airQualityIndex;
+        worstWarInfoEl.textContent = countryInfo.worstWar;
+        googleSearchEl.innerHTML = `<a href="https://www.google.com/search?q=${countryName}" target="_blank">Learn more about ${countryName}</a>`;
+
+        infoPanel.classList.add('visible');
+      });
+    }
+
+    // Load GeoJSON data
+    loadGeoJSONData();
+  </script>
+</body>
+</html>
