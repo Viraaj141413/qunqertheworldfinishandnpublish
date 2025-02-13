@@ -76,6 +76,45 @@
       color: #007BFF;
       text-decoration: underline;
     }
+
+    /* Media query for mobile screens */
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.8em; /* Smaller header on mobile */
+      }
+
+      #map {
+        height: 60vh; /* Reduce the map height on small screens */
+      }
+
+      #info-panel {
+        font-size: 1em; /* Slightly smaller text */
+        padding: 15px;
+        width: 95%;
+        max-width: 95%;
+      }
+
+      #info-panel h2 {
+        font-size: 1.5em;
+      }
+
+      #info-panel p {
+        font-size: 1em;
+      }
+    }
+
+    /* Media query for extra small screens (like very narrow mobile devices) */
+    @media (max-width: 480px) {
+      #info-panel {
+        max-height: 50vh;
+        font-size: 0.9em; /* Even smaller font size for smaller devices */
+        padding: 10px;
+      }
+
+      h1 {
+        font-size: 1.5em; /* Even smaller header */
+      }
+    }
   </style>
 </head>
 <body>
@@ -273,20 +312,22 @@
         const infoPanel = document.getElementById('info-panel');
 
         countryNameEl.textContent = `Country: ${countryName}`;
-        populationInfoEl.innerHTML = `<span class="population-link" onclick="window.open('https://www.google.com/search?q=${countryName}+population')">${countryInfo.population}</span>`;
-        areaInfoEl.textContent = countryInfo.area;
-        capitalInfoEl.textContent = countryInfo.capital;
-        languageInfoEl.textContent = countryInfo.languages;
-        militaryRankingInfoEl.textContent = countryInfo.militaryRanking;
-        airQualityIndexInfoEl.textContent = countryInfo.airQualityIndex;
-        worstWarInfoEl.textContent = countryInfo.worstWar;
-        googleSearchEl.innerHTML = `<a href="https://www.google.com/search?q=${countryName}" target="_blank">Learn more about ${countryName}</a>`;
+        populationInfoEl.innerHTML = `<span class="country-info">${countryInfo.population}</span>`;
+        areaInfoEl.innerHTML = `<span class="country-info">${countryInfo.area}</span>`;
+        capitalInfoEl.innerHTML = `<span class="country-info">${countryInfo.capital}</span>`;
+        languageInfoEl.innerHTML = `<span class="country-info">${countryInfo.languages}</span>`;
+        militaryRankingInfoEl.innerHTML = `<span class="country-info">${countryInfo.militaryRanking}</span>`;
+        airQualityIndexInfoEl.innerHTML = `<span class="country-info">${countryInfo.airQualityIndex}</span>`;
+        worstWarInfoEl.innerHTML = `<span class="country-info">${countryInfo.worstWar}</span>`;
 
-        infoPanel.classList.add('visible');
+        // Google search link
+        googleSearchEl.innerHTML = `Search more about <a href="https://www.google.com/search?q=${countryName}" target="_blank">${countryName}</a>`;
+
+        infoPanel.style.display = 'block';
       });
     }
 
-    // Load GeoJSON data
+    // Load the data and display the map
     loadGeoJSONData();
   </script>
 </body>
